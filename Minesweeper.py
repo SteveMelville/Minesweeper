@@ -15,6 +15,7 @@ class cell:
         self.rect = pygame.Rect(20*x, 20*y, 20, 20)
         self.type = 1
         self.isMine = False
+        self.isFlag = False
         self.numMines = 0
         self.x = x
         self.y = y
@@ -25,11 +26,22 @@ class cell:
                 self.isClicked = True
                 if button == 1:
                     self.type = self.sweep()
+                    if self.isMine:
+                        return True, False, self.isClicked
                 elif button == 3:
                     self.type = 3
+                    self.isFlag = True
+                    return False, True, self.isClicked
                 elif button == 2:
                     self.isClicked = False
-                
+        return False, False, False
+    
+    def initClick(self, pos):
+        if self.rect.collidepoint(pos):
+            return True
+        else:
+            return False
+    
     def sweep(self):
         if self.isMine:
             return 0
@@ -42,25 +54,51 @@ class cell:
         
         pygame.draw.rect(screen, colors[self.type], self.rect)
         pygame.draw.rect(screen, (128,128,128), self.rect, 2)
-        if self.isClicked and not self.isMine:
+        if self.type == 4 and not self.isMine and not self.isFlag:
             screen.blit(text, textrect)
+            
+            
         
-def isWinner(board):
-    return 0
+def isWinner(board, width, height):
+    isWon = True
+    for x in range(0,width):
+        for y in range(0,height):
+            if not board[x][y].isClicked:
+                isWon = False
+     
+    if isWon:
+        print("You have won!")
+            
 
 
+def loseGame(board, width, height):
+    for x in range(0,width):
+        for y in range(0,height):
+            board[x][y].isClicked = True
+            if board[x][y].isMine and not board[x][y].isFlag:
+                board[x][y].type = 0
+            elif board[x][y].isMine and board[x][y].isFlag:
+                board[x][y].type = 2
+                
+                
+    
 
-def generateBoard(board, width, height, numSquares, mines):
+def generateBoard(board, width, height, numSquares, mines, initX, initY):
     for x in range(0,width):
         for y in range(0,height):
             num = random.randint(1, numSquares)
-            if num <= mines:
-                board[x][y].isMine = True
-                mines = mines - 1
-                numSquares = numSquares - 1
+            if not x == initX and not y == initY:
+                if num <= mines:
+                    board[x][y].isMine = True
+                    mines = mines - 1
+                    numSquares = numSquares - 1
+                else:
+                    board[x][y].isMine = False
+                    numSquares = numSquares - 1
             else:
                 board[x][y].isMine = False
                 numSquares = numSquares - 1
+                
                 
     for x in range(0,width):
         for y in range(0, height):
@@ -73,22 +111,23 @@ def generateBoard(board, width, height, numSquares, mines):
                                 count = count + 1
     
                 board[x][y].numMines = count
-                
-    
     return board
+
+
 
 def main(xwidth, yheight, mines):
 
     numSquares = xwidth * yheight
     pygame.init()
-    size = width, height = xwidth * 20, yheight * 20
+    size = width, height = xwidth * 20, yheight * 20 + 50
     screen = pygame.display.set_mode(size)
+    numMines = mines 
+    firstClick = True
     
     basicfont = pygame.font.SysFont(None, 24)
     
     squares = [[cell(x,y) for y in range(0,yheight)] for x in range(0,xwidth)]
     
-    squares = generateBoard(squares, xwidth, yheight, numSquares, mines)
     
     while True:
         ev = pygame.event.get()
@@ -98,29 +137,59 @@ def main(xwidth, yheight, mines):
                 pygame.display.quit()
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
-                for x in range(0,xwidth):
-                    for y in range(0,yheight):
-                        squares[x][y].click(event.pos, event.button)
+                if firstClick:
+                    initX = -1
+                    initY = -1
+                    
+                    for x in range(0,xwidth):
+                        for y in range(0,yheight):
+                            isStart = squares[x][y].initClick(event.pos)
+                            if isStart:
+                                initX = x
+                                initY = y
+                                
+                    if initX > -1 and initY > -1:
+                        squares = generateBoard(squares, xwidth, yheight, numSquares, mines, initX, initY)
+                        squares[initX][initY].click(event.pos, event.button)
+                        numSquares = numSquares - 1
+                        firstClick = False
+        
+                        
+                else:
+                    for x in range(0,xwidth):
+                        for y in range(0,yheight):
+                            isMine, isFlag, isClicked = squares[x][y].click(event.pos, event.button)
+                            if isMine:
+                                loseGame(squares, xwidth, yheight)
+                                numSquares = 0
+                            if isFlag:
+                                numMines = numMines - 1
+                            if isClicked:
+                                isWinner(squares, xwidth, yheight)
+                                numSquares = numSquares - 1
+                                
+        
+                                
+        
             
                 
         screen.fill((0,0,0))
-        
-        #text = basicfont.render('Player: ' + str(turn), True, colors[3], colors[0])
-        #textrect = text.get_rect()
-        #textrect.centerx = screen.get_rect().centerx
-        #textrect.centery = screen.get_rect().centery
         
         for x in range(0,xwidth):
             for y in range(0,yheight):
                 text = basicfont.render(str(squares[x][y].numMines), True, colors[3], colors[4])
                 textrect = text.get_rect()
-                squares[x][y].draw(screen, text, textrect)
-                
-        
+                squares[x][y].draw(screen, text, textrect)        
+            
+        minesLeft = basicfont.render("Number of Mines Left: " + str(numMines), True, colors[4], colors[0])
+        minerect = minesLeft.get_rect()
+        minerect.centerx = xwidth * 20 / 2
+        minerect.centery = yheight * 20 + 30
+        screen.blit(minesLeft,minerect)
         
         pygame.display.flip()
             
     
 
         
-main(10, 10, 30)
+main(10, 10, 20)
