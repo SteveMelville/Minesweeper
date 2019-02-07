@@ -159,14 +159,13 @@ def main(xwidth, yheight, mines):
                     for x in range(0,xwidth):
                         for y in range(0,yheight):
                             isMine, isFlag, isClicked = squares[x][y].click(event.pos, event.button)
+                            if isClicked:
+                                isWinner(squares, xwidth, yheight)
                             if isMine:
                                 loseGame(squares, xwidth, yheight)
                                 numSquares = 0
                             if isFlag:
                                 numMines = numMines - 1
-                            if isClicked:
-                                isWinner(squares, xwidth, yheight)
-                                numSquares = numSquares - 1
                                 
         
                                 
